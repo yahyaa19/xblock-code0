@@ -1,0 +1,235 @@
+<div class="advanced-coding-xblock" id="advanced-coding-{{ xblock.scope_ids.usage_id }}">
+    <!-- Header Section -->
+    <div class="coding-header">
+        <h2 class="problem-title">{{ xblock.display_name }}</h2>
+        <div class="score-display">
+            <span class="score-label">Score:</span>
+            <span class="current-score">{{ current_score|floatformat:1 }}</span>
+            <span class="score-separator">/</span>
+            <span class="max-score">{{ max_score|floatformat:1 }}</span>
+            {% if best_score > current_score %}
+                <span class="best-score">(Best: {{ best_score|floatformat:1 }})</span>
+            {% endif %}
+            <span class="submission-count">({{ submission_count }} submissions)</span>
+        </div>
+    </div>
+
+    <!-- Main Content Layout -->
+    <div class="coding-main-container">
+        <!-- Left Panel: Problem Statement and Test Cases -->
+        <div class="problem-panel">
+            <div class="panel-header">
+                <h3>Problem Statement</h3>
+            </div>
+            <div class="problem-content markdown-content">
+                <div class="problem-statement">{{ problem_statement|default:"No problem statement provided." }}</div>
+            </div>
+            
+            <!-- Public Test Cases -->
+            {% if test_cases %}
+            <div class="test-cases-section">
+                <h4>Public Test Cases</h4>
+                <div class="test-cases-list">
+                    {% for test_case in test_cases %}
+                    <div class="test-case" data-test-id="{{ test_case.id }}">
+                        <div class="test-case-header">
+                            <strong>{{ test_case.name }}</strong>
+                            <span class="test-points">({{ test_case.points }} points)</span>
+                        </div>
+                        <div class="test-case-details">
+                            <div class="test-input">
+                                <label>Input:</label>
+                                <pre>{{ test_case.input|default:"No input" }}</pre>
+                            </div>
+                            <div class="test-output">
+                                <label>Expected Output:</label>
+                                <pre>{{ test_case.expected_output }}</pre>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Panel: Code Editor and Controls -->
+        <div class="editor-panel">
+            <!-- File Management Toolbar -->
+            <div class="file-toolbar">
+                <div class="file-tabs-container">
+                    <div class="file-tabs" id="file-tabs-{{ xblock.scope_ids.usage_id }}">
+                        {% for filename, file_data in student_files.items %}
+                        <div class="file-tab {% if filename == active_file %}active{% endif %}" 
+                             data-filename="{{ filename }}"
+                             data-language="{{ file_data.language }}">
+                            <span class="tab-name">{{ filename }}</span>
+                            {% if student_files|length > 1 %}
+                            <button class="tab-close" data-filename="{{ filename }}" title="Close file">×</button>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="file-actions">
+                        <button class="btn btn-sm new-file-btn" title="New File">
+                            <i class="fa fa-plus"></i> New File
+                        </button>
+                        <div class="language-selector">
+                            <label>Language:</label>
+                            <select id="language-select-{{ xblock.scope_ids.usage_id }}">
+                                {% for lang_key, lang_config in supported_languages.items %}
+                                <option value="{{ lang_key }}" {% if lang_key == current_language %}selected{% endif %}>
+                                    {{ lang_config.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monaco Editor Container -->
+            <div class="editor-container">
+                <div id="monaco-editor-{{ xblock.scope_ids.usage_id }}" class="monaco-editor"></div>
+            </div>
+
+            <!-- Editor Controls -->
+            <div class="editor-controls">
+                <div class="control-group">
+                    <button class="btn btn-primary run-code-btn">
+                        <i class="fa fa-play"></i> Run Code
+                    </button>
+                    <button class="btn btn-success submit-solution-btn">
+                        <i class="fa fa-check"></i> Submit Solution
+                    </button>
+                    <button class="btn btn-secondary save-file-btn">
+                        <i class="fa fa-save"></i> Save
+                    </button>
+                </div>
+                <div class="control-group">
+                    <button class="btn btn-sm btn-outline rename-file-btn" title="Rename File">
+                        <i class="fa fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline delete-file-btn" title="Delete File" 
+                            {% if student_files|length <= 1 %}disabled{% endif %}>
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Panel: Output and Results -->
+    <div class="output-panel">
+        <!-- Output Tabs -->
+        <div class="output-tabs">
+            <button class="output-tab active" data-tab="console">Console Output</button>
+            <button class="output-tab" data-tab="test-results">Test Results</button>
+            <button class="output-tab" data-tab="custom-input">Custom Input</button>
+        </div>
+
+        <!-- Console Output Tab -->
+        <div class="output-content active" data-content="console">
+            <div class="console-container">
+                <div class="console-header">
+                    <span class="console-title">Output</span>
+                    <button class="btn btn-sm clear-console-btn">Clear</button>
+                </div>
+                <div class="console-output" id="console-output-{{ xblock.scope_ids.usage_id }}">
+                    <div class="console-message">Click "Run Code" to see output here.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Results Tab -->
+        <div class="output-content" data-content="test-results">
+            <div class="test-results-container">
+                <div class="test-results-header">
+                    <span class="results-title">Test Results</span>
+                    <div class="results-summary" id="test-summary-{{ xblock.scope_ids.usage_id }}">
+                        Submit your solution to see test results.
+                    </div>
+                </div>
+                <div class="test-results-list" id="test-results-{{ xblock.scope_ids.usage_id }}">
+                    <!-- Test results will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Input Tab -->
+        <div class="output-content" data-content="custom-input">
+            <div class="custom-input-container">
+                <div class="input-section">
+                    <label for="custom-input-{{ xblock.scope_ids.usage_id }}">Custom Input (for testing):</label>
+                    <textarea id="custom-input-{{ xblock.scope_ids.usage_id }}" 
+                              class="custom-input-field"
+                              placeholder="Enter custom input here..."
+                              rows="6"></textarea>
+                    <button class="btn btn-primary run-with-input-btn">
+                        <i class="fa fa-play"></i> Run with Input
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-{{ xblock.scope_ids.usage_id }}" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <div class="loading-text">Processing...</div>
+        </div>
+    </div>
+
+    <!-- File Management Modal -->
+    <div class="modal" id="file-modal-{{ xblock.scope_ids.usage_id }}" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title-{{ xblock.scope_ids.usage_id }}">Create New File</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="filename-input-{{ xblock.scope_ids.usage_id }}">File Name:</label>
+                    <input type="text" id="filename-input-{{ xblock.scope_ids.usage_id }}" 
+                           class="filename-input" placeholder="example.py">
+                </div>
+                <div class="form-group">
+                    <label for="modal-language-select-{{ xblock.scope_ids.usage_id }}">Language:</label>
+                    <select id="modal-language-select-{{ xblock.scope_ids.usage_id }}">
+                        {% for lang_key, lang_config in supported_languages.items %}
+                        <option value="{{ lang_key }}">{{ lang_config.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-cancel">Cancel</button>
+                <button class="btn btn-primary modal-confirm">Create File</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Area -->
+    <div class="notification-area" id="notifications-{{ xblock.scope_ids.usage_id }}"></div>
+
+    <!-- Hidden data for JavaScript -->
+    <script type="application/json" class="xblock-json-init-args">
+    {
+        "element_id": "advanced-coding-{{ xblock.scope_ids.usage_id }}",
+        "student_files": {{ student_files|safe }},
+        "supported_languages": {{ supported_languages|safe }},
+        "current_language": "{{ current_language }}",
+        "active_file": "{{ active_file }}",
+        "xblock_id": "{{ xblock.scope_ids.usage_id }}",
+        "handlers": {
+            "save_file": "{% url 'save_file' %}",
+            "delete_file": "{% url 'delete_file' %}",
+            "rename_file": "{% url 'rename_file' %}",
+            "run_code": "{% url 'run_code' %}",
+            "submit_solution": "{% url 'submit_solution' %}",
+            "get_student_data": "{% url 'get_student_data' %}"
+        }
+    }
+    </script>
+</div>
