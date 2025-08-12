@@ -255,6 +255,13 @@ class AdvancedCodingXBlock(StudioEditableXBlockMixin, XBlock):
             'current_score': self.current_score,
             'best_score': self.best_score,
             'submission_count': self.submission_count,
+            # Add handler URLs
+            'save_file_url': self.runtime.handler_url(self, 'save_file'),
+            'delete_file_url': self.runtime.handler_url(self, 'delete_file'),
+            'rename_file_url': self.runtime.handler_url(self, 'rename_file'),
+            'run_code_url': self.runtime.handler_url(self, 'run_code'),
+            'submit_solution_url': self.runtime.handler_url(self, 'submit_solution'),
+            'get_student_data_url': self.runtime.handler_url(self, 'get_student_data'),
         }
 
         # Load HTML template

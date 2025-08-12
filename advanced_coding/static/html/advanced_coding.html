@@ -223,12 +223,12 @@
         "active_file": "{{ active_file }}",
         "xblock_id": "{{ xblock.scope_ids.usage_id }}",
         "handlers": {
-            "save_file": "{% url 'save_file' %}",
-            "delete_file": "{% url 'delete_file' %}",
-            "rename_file": "{% url 'rename_file' %}",
-            "run_code": "{% url 'run_code' %}",
-            "submit_solution": "{% url 'submit_solution' %}",
-            "get_student_data": "{% url 'get_student_data' %}"
+            "save_file": "{{ save_file_url }}",
+            "delete_file": "{{ delete_file_url }}",
+            "rename_file": "{{ rename_file_url }}",
+            "run_code": "{{ run_code_url }}",
+            "submit_solution": "{{ submit_solution_url }}",
+            "get_student_data": "{{ get_student_data_url }}"
         }
     }
     </script>
