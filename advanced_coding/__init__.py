@@ -18,8 +18,8 @@ from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.fields import Scope, String, Integer, Float, Dict as DictField, List as ListField, Boolean
 from xblock.validation import ValidationMessage
-from xblockutils.studio_editable import StudioEditableXBlockMixin
-from xblockutils.resources import ResourceLoader
+from xblock.utils.studio_editable import StudioEditableXBlockMixin
+from xblock.utils.resources import ResourceLoader
 
 logger = logging.getLogger(__name__)
 loader = ResourceLoader(__name__)
@@ -67,7 +67,7 @@ class AdvancedCodingXBlock(StudioEditableXBlockMixin, XBlock):
             "javascript": {"id": 63, "name": "JavaScript", "extension": "js", "template": "// Write your JavaScript code here\nconsole.log('Hello, World!');"},
             "c": {"id": 75, "name": "C", "extension": "c", "template": "#include <stdio.h>\n\nint main() {\n    printf(\"Hello, World!\\n\");\n    return 0;\n}"}
         },
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     # Default programming language
@@ -75,7 +75,7 @@ class AdvancedCodingXBlock(StudioEditableXBlockMixin, XBlock):
         display_name="Default Language",
         help="Default programming language for new projects",
         default="python",
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     # Judge0 API configuration
@@ -83,21 +83,21 @@ class AdvancedCodingXBlock(StudioEditableXBlockMixin, XBlock):
         display_name="Judge0 API URL",
         help="Judge0 API base URL for code execution",
         default="https://judge0-ce.p.rapidapi.com",
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     judge0_api_key = String(
         display_name="Judge0 API Key",
         help="RapidAPI key for Judge0 service (keep secure)",
         default="",
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     judge0_api_host = String(
         display_name="Judge0 API Host",
         help="RapidAPI host for Judge0 service",
         default="judge0-ce.p.rapidapi.com",
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     # Test cases configuration
@@ -123,7 +123,7 @@ class AdvancedCodingXBlock(StudioEditableXBlockMixin, XBlock):
         display_name="Maximum Score",
         help="Maximum score for this problem",
         default=100.0,
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     # Time and resource limits
@@ -131,14 +131,14 @@ class AdvancedCodingXBlock(StudioEditableXBlockMixin, XBlock):
         display_name="Execution Time Limit (seconds)",
         help="Maximum execution time for code submissions",
         default=5.0,
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     memory_limit = Integer(
         display_name="Memory Limit (KB)",
         help="Maximum memory usage for code execution",
         default=128000,
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     # File management settings
@@ -146,21 +146,21 @@ class AdvancedCodingXBlock(StudioEditableXBlockMixin, XBlock):
         display_name="Maximum Files",
         help="Maximum number of files allowed per project",
         default=10,
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     max_file_size = Integer(
         display_name="Maximum File Size (bytes)",
         help="Maximum size per file in bytes",
         default=100000,
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     allowed_file_extensions = ListField(
         display_name="Allowed File Extensions",
         help="List of allowed file extensions",
         default=[".py", ".java", ".cpp", ".c", ".js", ".h", ".hpp", ".txt", ".md"],
-        scope=Scope.content
+        scope=Scope.settings
     )
 
     # Student data fields
@@ -202,604 +202,439 @@ class AdvancedCodingXBlock(StudioEditableXBlockMixin, XBlock):
 
     best_score = Float(
         display_name="Best Score",
-        help="Student's best score achieved",
+        help="Student's best score for this problem",
         default=0.0,
         scope=Scope.user_state
     )
 
     submission_count = Integer(
         display_name="Submission Count",
-        help="Number of submissions made by student",
+        help="Number of submissions made by the student",
         default=0,
         scope=Scope.user_state
     )
 
-    last_submission_time = String(
-        display_name="Last Submission Time",
-        help="Timestamp of last submission",
-        default="",
-        scope=Scope.user_state
-    )
+    # Studio editable fields
+    editable_fields = [
+        'display_name',
+        'problem_statement',
+        'supported_languages',
+        'default_language',
+        'judge0_api_url',
+        'judge0_api_key',
+        'judge0_api_host',
+        'test_cases',
+        'max_score',
+        'execution_time_limit',
+        'memory_limit',
+        'max_files',
+        'max_file_size',
+        'allowed_file_extensions'
+    ]
 
-    # Studio editor configuration
-    editable_fields = (
-        'display_name', 'problem_statement', 'supported_languages', 'default_language',
-        'judge0_api_url', 'judge0_api_key', 'judge0_api_host', 'test_cases',
-        'max_score', 'execution_time_limit', 'memory_limit', 'max_files',
-        'max_file_size', 'allowed_file_extensions'
-    )
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._initialize_student_files()
 
-    def resource_string(self, path):
-        """Handy helper for getting resources from our kit."""
-        data = loader.load_unicode(path)
-        return data
+    def _initialize_student_files(self):
+        """Initialize student files if none exist"""
+        if not self.student_files:
+            default_lang = self.default_language or 'python'
+            lang_config = self.supported_languages.get(default_lang, {})
+            template = lang_config.get('template', '# Write your code here')
+            extension = lang_config.get('extension', 'py')
+            
+            self.student_files = {
+                f'main.{extension}': {
+                    'content': template,
+                    'language': default_lang,
+                    'created': datetime.now(timezone.utc).isoformat(),
+                    'modified': datetime.now(timezone.utc).isoformat()
+                }
+            }
+            self.active_file = f'main.{extension}'
+            self.current_language = default_lang
 
     def student_view(self, context=None):
-        """
-        Create a fragment used to display the XBlock to a student.
-        """
-        # Initialize student files if empty
-        if not self.student_files:
-            self._initialize_student_files()
-
+        """Render the student view of the XBlock"""
+        context = context or {}
+        
+        # Ensure student files are initialized
+        self._initialize_student_files()
+        
         # Prepare context for template
         template_context = {
             'xblock': self,
+            'problem_statement': self.problem_statement,
+            'test_cases': self.test_cases,
+            'student_files': self.student_files,
+            'current_language': self.current_language,
+            'active_file': self.active_file,
+            'supported_languages': self.supported_languages,
+            'current_score': self.current_score,
+            'best_score': self.best_score,
+            'max_score': self.max_score,
+            'submission_count': self.submission_count,
+        }
+        
+        # Render the template
+        html = loader.render_template('advanced_coding/advanced_coding.html', template_context)
+        
+        # Create fragment
+        fragment = Fragment(html)
+        
+        # Add CSS
+        fragment.add_css(loader.load_unicode('static/css/advanced_coding.css'))
+        
+        # Add JavaScript
+        fragment.add_javascript(loader.load_unicode('static/js/advanced_coding.js'))
+        
+        # Add initialization data
+        fragment.initialize_js('AdvancedCodingXBlock', {
+            'xblock_id': str(self.scope_ids.usage_id),
             'student_files': self.student_files,
             'supported_languages': self.supported_languages,
             'current_language': self.current_language,
             'active_file': self.active_file,
-            'problem_statement': self.problem_statement,
-            'test_cases': [tc for tc in self.test_cases if tc.get('is_public', True)],
+            'test_cases': self.test_cases,
             'max_score': self.max_score,
             'current_score': self.current_score,
             'best_score': self.best_score,
             'submission_count': self.submission_count,
-            # Add handler URLs
-            'save_file_url': self.runtime.handler_url(self, 'save_file'),
-            'delete_file_url': self.runtime.handler_url(self, 'delete_file'),
-            'rename_file_url': self.runtime.handler_url(self, 'rename_file'),
-            'run_code_url': self.runtime.handler_url(self, 'run_code'),
-            'submit_solution_url': self.runtime.handler_url(self, 'submit_solution'),
-            'get_student_data_url': self.runtime.handler_url(self, 'get_student_data'),
-        }
-
-        # Load HTML template
-        html = loader.render_django_template('static/html/advanced_coding.html', template_context)
+        })
         
-        # Create fragment
-        frag = Fragment(html)
-        
-        # Add CSS
-        frag.add_css(self.resource_string("static/css/advanced_coding.css"))
-        
-        # Add JavaScript
-        frag.add_javascript(self.resource_string("static/js/advanced_coding.js"))
-        
-        # Initialize JavaScript
-        frag.initialize_js('AdvancedCodingXBlock')
-        
-        return frag
+        return fragment
 
     def studio_view(self, context=None):
-        """
-        Create a fragment used to display the edit form in the Studio.
-        """
-        frag = super().studio_view(context)
-        frag.add_css(self.resource_string("static/css/advanced_coding_studio.css"))
-        frag.add_javascript(self.resource_string("static/js/advanced_coding_studio.js"))
-        frag.initialize_js('AdvancedCodingStudioXBlock')
-        return frag
+        """Render the studio view of the XBlock"""
+        return self._editable_view(context)
 
-    def _initialize_student_files(self):
-        """Initialize student files with default template based on selected language."""
-        lang_config = self.supported_languages.get(self.default_language, self.supported_languages['python'])
-        template_code = lang_config.get('template', '// Write your code here')
-        extension = lang_config.get('extension', 'py')
+    def _editable_view(self, context=None):
+        """Render the editable view for studio"""
+        context = context or {}
+        context.update({
+            'xblock': self,
+            'editable_fields': self.editable_fields,
+        })
         
-        self.student_files = {
-            f"main.{extension}": {
-                'content': template_code,
-                'language': self.default_language,
-                'created_at': datetime.now(timezone.utc).isoformat(),
-                'modified_at': datetime.now(timezone.utc).isoformat()
-            }
-        }
-        self.active_file = f"main.{extension}"
-        self.current_language = self.default_language
-
-    def validate_file_name(self, filename: str) -> Tuple[bool, str]:
-        """Validate file name for security and format requirements."""
-        if not filename:
-            return False, "File name cannot be empty"
+        html = loader.render_template('static/html/advanced_coding_studio.html', context)
+        fragment = Fragment(html)
         
-        if len(filename) > 100:
-            return False, "File name too long (max 100 characters)"
+        # Add studio-specific CSS and JS
+        fragment.add_css(loader.load_unicode('static/css/advanced_coding_studio.css'))
+        fragment.add_javascript(loader.load_unicode('static/js/advanced_coding_studio.js'))
         
-        # Check for dangerous characters
-        dangerous_chars = ['..', '/', '\\', ':', '*', '?', '"', '<', '>', '|']
-        for char in dangerous_chars:
-            if char in filename:
-                return False, f"File name contains invalid character: {char}"
+        fragment.initialize_js('AdvancedCodingStudioXBlock', {
+            'xblock_id': str(self.scope_ids.usage_id),
+            'editable_fields': self.editable_fields,
+        })
         
-        # Check file extension
-        if '.' not in filename:
-            return False, "File name must have an extension"
-        
-        extension = '.' + filename.split('.')[-1].lower()
-        if extension not in self.allowed_file_extensions:
-            return False, f"File extension {extension} not allowed"
-        
-        return True, ""
-
-    def validate_file_content(self, content: str) -> Tuple[bool, str]:
-        """Validate file content for security and size requirements."""
-        if len(content.encode('utf-8')) > self.max_file_size:
-            return False, f"File size exceeds limit of {self.max_file_size} bytes"
-        
-        # Basic content filtering - block obviously dangerous patterns
-        dangerous_patterns = [
-            'import os', 'import sys', 'import subprocess', '__import__',
-            'eval(', 'exec(', 'compile(', 'open(', 'file(',
-            'socket', 'urllib', 'requests', 'http'
-        ]
-        
-        content_lower = content.lower()
-        for pattern in dangerous_patterns:
-            if pattern in content_lower:
-                logger.warning(f"Potentially dangerous pattern detected: {pattern}")
-                # Note: In production, you might want to be more strict here
-        
-        return True, ""
+        return fragment
 
     @XBlock.json_handler
     def save_file(self, data, suffix=''):
-        """Save or update a file in the student's project."""
+        """Save a file with the given content"""
         try:
             filename = data.get('filename', '').strip()
             content = data.get('content', '')
             language = data.get('language', self.current_language)
             
-            # Validate inputs
-            is_valid, error_msg = self.validate_file_name(filename)
-            if not is_valid:
-                return {'success': False, 'error': error_msg}
+            # Validate filename
+            valid, msg = self.validate_file_name(filename)
+            if not valid:
+                return {'success': False, 'error': msg}
             
-            is_valid, error_msg = self.validate_file_content(content)
-            if not is_valid:
-                return {'success': False, 'error': error_msg}
+            # Validate content
+            valid, msg = self.validate_file_content(content)
+            if not valid:
+                return {'success': False, 'error': msg}
             
             # Check file count limit
             if filename not in self.student_files and len(self.student_files) >= self.max_files:
-                return {'success': False, 'error': f'Maximum number of files ({self.max_files}) reached'}
-            
-            # Clean content
-            content = bleach.clean(content, tags=[], attributes={}, strip=True)
+                return {'success': False, 'error': f'Maximum file limit ({self.max_files}) reached'}
             
             # Save file
-            now = datetime.now(timezone.utc).isoformat()
-            if filename in self.student_files:
-                self.student_files[filename]['content'] = content
-                self.student_files[filename]['language'] = language
-                self.student_files[filename]['modified_at'] = now
-            else:
-                self.student_files[filename] = {
-                    'content': content,
-                    'language': language,
-                    'created_at': now,
-                    'modified_at': now
-                }
+            self.student_files[filename] = {
+                'content': content,
+                'language': language,
+                'created': datetime.now(timezone.utc).isoformat(),
+                'modified': datetime.now(timezone.utc).isoformat()
+            }
             
-            # Update active file
-            self.active_file = filename
-            self.current_language = language
+            # Update active file if this is a new file
+            if filename not in self.student_files:
+                self.active_file = filename
+                self.current_language = language
             
-            return {'success': True, 'message': f'File {filename} saved successfully'}
+            return {'success': True, 'filename': filename}
             
         except Exception as e:
-            logger.error(f"Error saving file: {str(e)}")
-            return {'success': False, 'error': 'Failed to save file'}
+            logger.error(f"Error saving file: {e}")
+            return {'success': False, 'error': 'Internal server error'}
 
     @XBlock.json_handler
     def delete_file(self, data, suffix=''):
-        """Delete a file from the student's project."""
+        """Delete a file"""
         try:
             filename = data.get('filename', '').strip()
             
             if not filename:
-                return {'success': False, 'error': 'File name required'}
+                return {'success': False, 'error': 'Filename is required'}
             
             if filename not in self.student_files:
                 return {'success': False, 'error': 'File not found'}
             
+            # Don't allow deleting the last file
             if len(self.student_files) <= 1:
                 return {'success': False, 'error': 'Cannot delete the last file'}
             
-            # Delete file
+            # Remove file
             del self.student_files[filename]
             
-            # Update active file if necessary
+            # Update active file if needed
             if self.active_file == filename:
                 self.active_file = list(self.student_files.keys())[0]
+                self.current_language = self.student_files[self.active_file]['language']
             
-            return {'success': True, 'message': f'File {filename} deleted successfully'}
+            return {'success': True, 'filename': filename}
             
         except Exception as e:
-            logger.error(f"Error deleting file: {str(e)}")
-            return {'success': False, 'error': 'Failed to delete file'}
+            logger.error(f"Error deleting file: {e}")
+            return {'success': False, 'error': 'Internal server error'}
 
     @XBlock.json_handler
     def rename_file(self, data, suffix=''):
-        """Rename a file in the student's project."""
+        """Rename a file"""
         try:
             old_filename = data.get('old_filename', '').strip()
             new_filename = data.get('new_filename', '').strip()
             
             if not old_filename or not new_filename:
-                return {'success': False, 'error': 'Both old and new file names required'}
+                return {'success': False, 'error': 'Both old and new filenames are required'}
             
             if old_filename not in self.student_files:
-                return {'success': False, 'error': 'Original file not found'}
-            
-            if new_filename in self.student_files:
-                return {'success': False, 'error': 'File with new name already exists'}
+                return {'success': False, 'error': 'File not found'}
             
             # Validate new filename
-            is_valid, error_msg = self.validate_file_name(new_filename)
-            if not is_valid:
-                return {'success': False, 'error': error_msg}
+            valid, msg = self.validate_file_name(new_filename)
+            if not valid:
+                return {'success': False, 'error': msg}
+            
+            # Check if new filename already exists
+            if new_filename in self.student_files:
+                return {'success': False, 'error': 'File with that name already exists'}
             
             # Rename file
-            file_data = self.student_files[old_filename].copy()
-            file_data['modified_at'] = datetime.now(timezone.utc).isoformat()
-            
-            del self.student_files[old_filename]
+            file_data = self.student_files[old_filename]
             self.student_files[new_filename] = file_data
+            del self.student_files[old_filename]
             
-            # Update active file if necessary
+            # Update active file if needed
             if self.active_file == old_filename:
                 self.active_file = new_filename
             
-            return {'success': True, 'message': f'File renamed from {old_filename} to {new_filename}'}
+            return {'success': True, 'old_filename': old_filename, 'new_filename': new_filename}
             
         except Exception as e:
-            logger.error(f"Error renaming file: {str(e)}")
-            return {'success': False, 'error': 'Failed to rename file'}
+            logger.error(f"Error renaming file: {e}")
+            return {'success': False, 'error': 'Internal server error'}
 
     @XBlock.json_handler
     def run_code(self, data, suffix=''):
-        """Execute student code using Judge0 API."""
+        """Run code with Judge0 API"""
         try:
-            filename = data.get('filename', self.active_file)
-            custom_input = data.get('input', '')
+            if not self.judge0_api_key:
+                return {'success': False, 'error': 'Judge0 API key not configured'}
             
-            if filename not in self.student_files:
-                return {'success': False, 'error': 'File not found'}
+            # Get active file content
+            active_file = self.student_files.get(self.active_file)
+            if not active_file:
+                return {'success': False, 'error': 'No active file found'}
             
-            file_data = self.student_files[filename]
-            language = file_data.get('language', self.current_language)
-            code = file_data.get('content', '')
-            
-            if not code.strip():
-                return {'success': False, 'error': 'No code to execute'}
+            code = active_file['content']
+            language = active_file['language']
             
             # Get language configuration
             lang_config = self.supported_languages.get(language)
             if not lang_config:
                 return {'success': False, 'error': f'Unsupported language: {language}'}
             
-            # Execute code
-            result = self._execute_code_judge0(code, lang_config['id'], custom_input)
-            
-            if result['success']:
-                return {
-                    'success': True,
-                    'output': result.get('stdout', ''),
-                    'error': result.get('stderr', ''),
-                    'compile_output': result.get('compile_output', ''),
-                    'status': result.get('status', {}),
-                    'time': result.get('time', 0),
-                    'memory': result.get('memory', 0)
-                }
-            else:
-                return {'success': False, 'error': result.get('error', 'Execution failed')}
-                
-        except Exception as e:
-            logger.error(f"Error running code: {str(e)}")
-            return {'success': False, 'error': 'Failed to execute code'}
-
-    @XBlock.json_handler
-    def submit_solution(self, data, suffix=''):
-        """Submit solution and run against all test cases."""
-        try:
-            # Get main file or specified file
-            main_file = data.get('main_file')
-            if not main_file:
-                # Try to find main file
-                possible_mains = [f for f in self.student_files.keys() if 'main' in f.lower()]
-                if possible_mains:
-                    main_file = possible_mains[0]
-                else:
-                    main_file = list(self.student_files.keys())[0]
-            
-            if main_file not in self.student_files:
-                return {'success': False, 'error': 'Main file not found'}
-            
-            file_data = self.student_files[main_file]
-            language = file_data.get('language', self.current_language)
-            code = file_data.get('content', '')
-            
-            if not code.strip():
-                return {'success': False, 'error': 'No code to submit'}
-            
-            # Get language configuration
-            lang_config = self.supported_languages.get(language)
-            if not lang_config:
-                return {'success': False, 'error': f'Unsupported language: {language}'}
-            
-            # Run all test cases
-            test_results = []
-            total_score = 0.0
-            passed_tests = 0
-            
-            for test_case in self.test_cases:
-                result = self._execute_code_judge0(
-                    code, 
-                    lang_config['id'], 
-                    test_case.get('input', ''),
-                    timeout=test_case.get('timeout', self.execution_time_limit)
-                )
-                
-                if result['success']:
-                    expected = test_case.get('expected_output', '').strip()
-                    actual = result.get('stdout', '').strip()
-                    passed = expected == actual
-                    
-                    if passed:
-                        passed_tests += 1
-                        total_score += test_case.get('points', 0)
-                    
-                    test_results.append({
-                        'test_id': test_case.get('id', ''),
-                        'name': test_case.get('name', ''),
-                        'passed': passed,
-                        'expected_output': expected if test_case.get('is_public', True) else '[Hidden]',
-                        'actual_output': actual,
-                        'points': test_case.get('points', 0),
-                        'earned_points': test_case.get('points', 0) if passed else 0,
-                        'execution_time': result.get('time', 0),
-                        'memory_used': result.get('memory', 0),
-                        'is_public': test_case.get('is_public', True)
-                    })
-                else:
-                    test_results.append({
-                        'test_id': test_case.get('id', ''),
-                        'name': test_case.get('name', ''),
-                        'passed': False,
-                        'error': result.get('error', 'Execution failed'),
-                        'points': test_case.get('points', 0),
-                        'earned_points': 0,
-                        'is_public': test_case.get('is_public', True)
-                    })
-            
-            # Calculate final score
-            max_possible = sum(tc.get('points', 0) for tc in self.test_cases)
-            if max_possible > 0:
-                score_percentage = (total_score / max_possible) * 100
-                final_score = min(score_percentage * (self.max_score / 100), self.max_score)
-            else:
-                final_score = 0.0
-            
-            # Save submission
-            submission = {
-                'id': str(uuid.uuid4()),
-                'timestamp': datetime.now(timezone.utc).isoformat(),
-                'code': code,
-                'main_file': main_file,
-                'language': language,
-                'test_results': test_results,
-                'score': final_score,
-                'passed_tests': passed_tests,
-                'total_tests': len(self.test_cases)
+            # Prepare submission data
+            submission_data = {
+                'source_code': code,
+                'language_id': lang_config['id'],
+                'stdin': data.get('input', ''),
+                'cpu_time_limit': self.execution_time_limit,
+                'memory_limit': self.memory_limit
             }
             
-            self.submissions.append(submission)
-            self.submission_count += 1
-            self.current_score = final_score
-            self.last_submission_time = submission['timestamp']
-            
-            # Update best score
-            if final_score > self.best_score:
-                self.best_score = final_score
-            
-            # Publish grade
-            self._publish_grade(final_score)
-            
-            return {
-                'success': True,
-                'submission_id': submission['id'],
-                'score': final_score,
-                'max_score': self.max_score,
-                'passed_tests': passed_tests,
-                'total_tests': len(self.test_cases),
-                'test_results': [tr for tr in test_results if tr.get('is_public', True)],
-                'message': f'Submitted successfully! Score: {final_score:.1f}/{self.max_score}'
+            # Submit to Judge0
+            headers = {
+                'X-RapidAPI-Key': self.judge0_api_key,
+                'X-RapidAPI-Host': self.judge0_api_host,
+                'Content-Type': 'application/json'
             }
             
-        except Exception as e:
-            logger.error(f"Error submitting solution: {str(e)}")
-            return {'success': False, 'error': 'Failed to submit solution'}
-
-    def _execute_code_judge0(self, code: str, language_id: int, stdin: str = "", timeout: float = None) -> Dict:
-        """Execute code using Judge0 API."""
-        if not self.judge0_api_key:
-            return {'success': False, 'error': 'Judge0 API key not configured'}
-        
-        if timeout is None:
-            timeout = self.execution_time_limit
-        
-        headers = {
-            'X-RapidAPI-Key': self.judge0_api_key,
-            'X-RapidAPI-Host': self.judge0_api_host,
-            'Content-Type': 'application/json'
-        }
-        
-        # Prepare submission data
-        submission_data = {
-            'source_code': code,
-            'language_id': language_id,
-            'stdin': stdin,
-            'cpu_time_limit': timeout,
-            'memory_limit': self.memory_limit // 1024,  # Convert to MB
-            'wall_time_limit': timeout + 1,
-            'compiler_options': '',
-            'command_line_arguments': '',
-            'redirect_stderr_to_stdout': False,
-            'callback_url': '',
-            'additional_files': ''
-        }
-        
-        try:
-            # Submit code for execution
-            submit_url = f"{self.judge0_api_url}/submissions"
             response = requests.post(
-                submit_url,
+                f"{self.judge0_api_url}/submissions",
                 json=submission_data,
                 headers=headers,
-                timeout=10
+                timeout=30
             )
             
             if response.status_code != 201:
-                logger.error(f"Judge0 submission failed: {response.status_code} - {response.text}")
-                return {'success': False, 'error': f'Submission failed: {response.status_code}'}
+                return {'success': False, 'error': f'Judge0 API error: {response.status_code}'}
             
             submission = response.json()
             token = submission.get('token')
             
-            if not token:
-                return {'success': False, 'error': 'No submission token received'}
+            # Wait for result
+            time.sleep(2)  # Simple wait - in production, use polling
             
-            # Poll for results
-            max_attempts = 30
-            attempt = 0
+            # Get result
+            result_response = requests.get(
+                f"{self.judge0_api_url}/submissions/{token}",
+                headers=headers,
+                timeout=30
+            )
             
-            while attempt < max_attempts:
-                time.sleep(1)  # Wait 1 second between polls
+            if result_response.status_code != 200:
+                return {'success': False, 'error': 'Failed to get execution result'}
+            
+            result = result_response.json()
+            
+            return {
+                'success': True,
+                'output': result.get('stdout', ''),
+                'error': result.get('stderr', ''),
+                'status': result.get('status', {}).get('description', 'Unknown'),
+                'execution_time': result.get('time', 0),
+                'memory_used': result.get('memory', 0)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error running code: {e}")
+            return {'success': False, 'error': 'Internal server error'}
+
+    @XBlock.json_handler
+    def submit_solution(self, data, suffix=''):
+        """Submit solution for grading"""
+        try:
+            # Run all test cases
+            test_results = []
+            total_score = 0
+            
+            for test_case in self.test_cases:
+                # Run test case
+                test_data = {
+                    'input': test_case.get('input', ''),
+                    'language': self.current_language
+                }
                 
-                result_url = f"{self.judge0_api_url}/submissions/{token}"
-                result_response = requests.get(result_url, headers=headers, timeout=10)
-                
-                if result_response.status_code != 200:
-                    logger.error(f"Judge0 result fetch failed: {result_response.status_code}")
+                result = self.run_code(test_data)
+                if not result['success']:
+                    test_results.append({
+                        'test_id': test_case['id'],
+                        'passed': False,
+                        'error': result['error'],
+                        'points': 0
+                    })
                     continue
                 
-                result = result_response.json()
-                status = result.get('status', {})
+                # Check output
+                expected = test_case.get('expected_output', '').strip()
+                actual = result.get('output', '').strip()
+                passed = expected == actual
                 
-                # Check if execution is complete
-                if status.get('id') not in [1, 2]:  # 1=In Queue, 2=Processing
-                    return {
-                        'success': True,
-                        'stdout': result.get('stdout', ''),
-                        'stderr': result.get('stderr', ''),
-                        'compile_output': result.get('compile_output', ''),
-                        'status': status,
-                        'time': result.get('time'),
-                        'memory': result.get('memory'),
-                        'token': token
-                    }
+                points = test_case.get('points', 0) if passed else 0
+                total_score += points
                 
-                attempt += 1
+                test_results.append({
+                    'test_id': test_case['id'],
+                    'passed': passed,
+                    'expected': expected,
+                    'actual': actual,
+                    'points': points,
+                    'execution_time': result.get('execution_time', 0)
+                })
             
-            return {'success': False, 'error': 'Execution timeout - results not available'}
+            # Create submission record
+            submission = {
+                'id': str(uuid.uuid4()),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'test_results': test_results,
+                'total_score': total_score,
+                'files': dict(self.student_files)
+            }
             
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Judge0 API request failed: {str(e)}")
-            return {'success': False, 'error': f'API request failed: {str(e)}'}
-        except Exception as e:
-            logger.error(f"Judge0 execution error: {str(e)}")
-            return {'success': False, 'error': f'Execution error: {str(e)}'}
-
-    def _publish_grade(self, score: float):
-        """Publish grade to Open edX gradebook."""
-        try:
-            self.runtime.publish(
-                self,
-                'grade',
-                {
-                    'value': score,
-                    'max_value': self.max_score,
-                    'user_id': self.scope_ids.user_id
-                }
-            )
-        except Exception as e:
-            logger.error(f"Failed to publish grade: {str(e)}")
-
-    @XBlock.json_handler
-    def get_student_data(self, data, suffix=''):
-        """Get current student data and state."""
-        return {
-            'files': self.student_files,
-            'active_file': self.active_file,
-            'current_language': self.current_language,
-            'current_score': self.current_score,
-            'best_score': self.best_score,
-            'submission_count': self.submission_count,
-            'supported_languages': self.supported_languages
-        }
-
-    @XBlock.json_handler
-    def reset_student_data(self, data, suffix=''):
-        """Reset student data (instructor only)."""
-        if not self.runtime.user_is_staff:
-            return {'success': False, 'error': 'Permission denied'}
-        
-        try:
-            self._initialize_student_files()
-            self.submissions = []
-            self.current_score = 0.0
-            self.best_score = 0.0
-            self.submission_count = 0
-            self.last_submission_time = ""
+            self.submissions.append(submission)
+            self.submission_count += 1
+            self.current_score = total_score
             
-            return {'success': True, 'message': 'Student data reset successfully'}
+            if total_score > self.best_score:
+                self.best_score = total_score
+            
+            return {
+                'success': True,
+                'total_score': total_score,
+                'max_score': self.max_score,
+                'test_results': test_results,
+                'submission_id': submission['id']
+            }
+            
         except Exception as e:
-            logger.error(f"Error resetting student data: {str(e)}")
-            return {'success': False, 'error': 'Failed to reset student data'}
+            logger.error(f"Error submitting solution: {e}")
+            return {'success': False, 'error': 'Internal server error'}
 
-    def validate(self):
-        """Validate XBlock configuration."""
-        validation = super().validate()
+    def validate_file_name(self, filename):
+        """Validate a filename"""
+        if not filename:
+            return False, "Filename cannot be empty"
         
-        # Validate Judge0 configuration
-        if not self.judge0_api_key:
-            validation.add(ValidationMessage(ValidationMessage.WARNING, 
-                          "Judge0 API key is not configured. Code execution will not work."))
+        if '.' not in filename:
+            return False, "Filename must have an extension"
         
-        # Validate test cases
-        if not self.test_cases:
-            validation.add(ValidationMessage(ValidationMessage.WARNING,
-                          "No test cases configured. Automated grading will not work."))
+        name, ext = filename.rsplit('.', 1)
+        if not name:
+            return False, "Filename cannot start with a dot"
         
-        # Validate supported languages
-        if not self.supported_languages:
-            validation.add(ValidationMessage(ValidationMessage.ERROR,
-                          "At least one programming language must be supported."))
+        if ext not in [ext.lstrip('.') for ext in self.allowed_file_extensions]:
+            return False, f"File extension '.{ext}' is not allowed"
         
-        return validation
+        # Check for invalid characters
+        invalid_chars = ['<', '>', ':', '"', '|', '?', '*', '\\', '/']
+        if any(char in filename for char in invalid_chars):
+            return False, "Filename contains invalid characters"
+        
+        return True, ""
 
-    @staticmethod
-    def workbench_scenarios():
-        """A canned scenario for display in the workbench."""
+    def validate_file_content(self, content):
+        """Validate file content"""
+        if not isinstance(content, str):
+            return False, "Content must be a string"
+        
+        if len(content) > self.max_file_size:
+            return False, f"File content exceeds maximum size ({self.max_file_size} bytes)"
+        
+        # Basic security check - look for potentially dangerous patterns
+        dangerous_patterns = [
+            'import os', 'import sys', 'import subprocess',
+            'eval(', 'exec(', '__import__(',
+            'open(', 'file(', 'raw_input(',
+            'input(', 'compile('
+        ]
+        
+        content_lower = content.lower()
+        for pattern in dangerous_patterns:
+            if pattern in content_lower:
+                return False, f"Content contains potentially dangerous pattern: {pattern}"
+        
+        return True, ""
+
+    def workbench_scenarios(self):
+        """Return workbench scenarios for testing"""
         return [
-            ("AdvancedCodingXBlock",
+            ("Advanced Coding XBlock",
              """<advanced_coding/>
-             """),
-            ("Multiple AdvancedCodingXBlock",
-             """<vertical_demo>
-                <advanced_coding/>
-                <advanced_coding/>
-                <advanced_coding/>
-                </vertical_demo>
-             """),
+              """)
         ]

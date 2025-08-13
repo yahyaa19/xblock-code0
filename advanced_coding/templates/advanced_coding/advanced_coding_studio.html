@@ -1,0 +1,190 @@
+{% load i18n %}
+{% load static %}
+
+<div class="advanced-coding-studio-xblock" id="advanced-coding-studio-{{ xblock.scope_ids.usage_id }}">
+    <div class="studio-edit-header">
+        <h3>Advanced Coding Assessment Configuration</h3>
+        <p class="help-text">Configure your coding assessment settings below.</p>
+    </div>
+
+    <div class="studio-edit-form">
+        <!-- Basic Settings -->
+        <div class="form-group">
+            <label for="display_name_{{ xblock.scope_ids.usage_id }}">Display Name</label>
+            <input type="text" 
+                   id="display_name_{{ xblock.scope_ids.usage_id }}"
+                   class="form-control"
+                   value="{{ xblock.display_name }}"
+                   data-field="display_name"
+                   placeholder="Enter display name">
+        </div>
+
+        <!-- Problem Statement -->
+        <div class="form-group">
+            <label for="problem_statement_{{ xblock.scope_ids.usage_id }}">Problem Statement</label>
+            <textarea id="problem_statement_{{ xblock.scope_ids.usage_id }}"
+                      class="form-control"
+                      rows="8"
+                      data-field="problem_statement"
+                      placeholder="Enter the coding problem description in Markdown format">{{ xblock.problem_statement }}</textarea>
+            <small class="form-text text-muted">Use Markdown formatting for rich text.</small>
+        </div>
+
+        <!-- Default Language -->
+        <div class="form-group">
+            <label for="default_language_{{ xblock.scope_ids.usage_id }}">Default Language</label>
+            <select id="default_language_{{ xblock.scope_ids.usage_id }}"
+                    class="form-control"
+                    data-field="default_language">
+                {% for lang_key, lang_config in xblock.supported_languages.items %}
+                <option value="{{ lang_key }}" {% if lang_key == xblock.default_language %}selected{% endif %}>
+                    {{ lang_config.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Judge0 API Configuration -->
+        <div class="form-group">
+            <label for="judge0_api_url_{{ xblock.scope_ids.usage_id }}">Judge0 API URL</label>
+            <input type="url" 
+                   id="judge0_api_url_{{ xblock.scope_ids.usage_id }}"
+                   class="form-control"
+                   value="{{ xblock.judge0_api_url }}"
+                   data-field="judge0_api_url"
+                   placeholder="https://judge0-ce.p.rapidapi.com">
+        </div>
+
+        <div class="form-group">
+            <label for="judge0_api_key_{{ xblock.scope_ids.usage_id }}">Judge0 API Key</label>
+            <input type="password" 
+                   id="judge0_api_key_{{ xblock.scope_ids.usage_id }}"
+                   class="form-control"
+                   value="{{ xblock.judge0_api_key }}"
+                   data-field="judge0_api_key"
+                   placeholder="Enter your RapidAPI key">
+            <small class="form-text text-muted">Keep this secure. Get your key from <a href="https://rapidapi.com/judge0-official/api/judge0-ce/" target="_blank">RapidAPI</a>.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="judge0_api_host_{{ xblock.scope_ids.usage_id }}">Judge0 API Host</label>
+            <input type="text" 
+                   id="judge0_api_host_{{ xblock.scope_ids.usage_id }}"
+                   class="form-control"
+                   value="{{ xblock.judge0_api_host }}"
+                   data-field="judge0_api_host"
+                   placeholder="judge0-ce.p.rapidapi.com">
+        </div>
+
+        <!-- Grading Settings -->
+        <div class="form-group">
+            <label for="max_score_{{ xblock.scope_ids.usage_id }}">Maximum Score</label>
+            <input type="number" 
+                   id="max_score_{{ xblock.scope_ids.usage_id }}"
+                   class="form-control"
+                   value="{{ xblock.max_score }}"
+                   data-field="max_score"
+                   min="0"
+                   step="0.1">
+        </div>
+
+        <!-- Execution Limits -->
+        <div class="form-group">
+            <label for="execution_time_limit_{{ xblock.scope_ids.usage_id }}">Execution Time Limit (seconds)</label>
+            <input type="number" 
+                   id="execution_time_limit_{{ xblock.scope_ids.usage_id }}"
+                   class="form-control"
+                   value="{{ xblock.execution_time_limit }}"
+                   data-field="execution_time_limit"
+                   min="0.1"
+                   step="0.1">
+        </div>
+
+        <div class="form-group">
+            <label for="memory_limit_{{ xblock.scope_ids.usage_id }}">Memory Limit (KB)</label>
+            <input type="number" 
+                   id="memory_limit_{{ xblock.scope_ids.usage_id }}"
+                   class="form-control"
+                   value="{{ xblock.memory_limit }}"
+                   data-field="memory_limit"
+                   min="1000"
+                   step="1000">
+        </div>
+
+        <!-- File Management Settings -->
+        <div class="form-group">
+            <label for="max_files_{{ xblock.scope_ids.usage_id }}">Maximum Files</label>
+            <input type="number" 
+                   id="max_files_{{ xblock.scope_ids.usage_id }}"
+                   class="form-control"
+                   value="{{ xblock.max_files }}"
+                   data-field="max_files"
+                   min="1"
+                   max="50">
+        </div>
+
+        <div class="form-group">
+            <label for="max_file_size_{{ xblock.scope_ids.usage_id }}">Maximum File Size (bytes)</label>
+            <input type="number" 
+                   id="max_file_size_{{ xblock.scope_ids.usage_id }}"
+                   class="form-control"
+                   value="{{ xblock.max_file_size }}"
+                   data-field="max_file_size"
+                   min="1000"
+                   step="1000">
+        </div>
+
+        <!-- Test Cases Section -->
+        <div class="test-cases-section">
+            <h4>Test Cases</h4>
+            <div id="test-cases-container_{{ xblock.scope_ids.usage_id }}">
+                {% for test_case in xblock.test_cases %}
+                <div class="test-case-item" data-test-id="{{ test_case.id }}">
+                    <div class="test-case-header">
+                        <input type="text" 
+                               class="form-control test-name"
+                               value="{{ test_case.name }}"
+                               placeholder="Test case name">
+                        <input type="number" 
+                               class="form-control test-points"
+                               value="{{ test_case.points }}"
+                               min="0"
+                               step="0.1"
+                               placeholder="Points">
+                        <button type="button" class="btn btn-danger btn-sm remove-test-case">Remove</button>
+                    </div>
+                    <div class="test-case-content">
+                        <div class="form-group">
+                            <label>Input:</label>
+                            <textarea class="form-control test-input" rows="2" placeholder="Test input">{{ test_case.input }}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Expected Output:</label>
+                            <textarea class="form-control test-expected" rows="2" placeholder="Expected output">{{ test_case.expected_output }}</textarea>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" 
+                                   class="form-check-input test-public" 
+                                   id="public_{{ test_case.id }}"
+                                   {% if test_case.is_public %}checked{% endif %}>
+                            <label class="form-check-label" for="public_{{ test_case.id }}">
+                                Public test case (visible to students)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="add-test-case_{{ xblock.scope_ids.usage_id }}">
+                <i class="fa fa-plus"></i> Add Test Case
+            </button>
+        </div>
+
+        <!-- Save Button -->
+        <div class="form-actions">
+            <button type="button" class="btn btn-primary" id="save-settings_{{ xblock.scope_ids.usage_id }}">
+                <i class="fa fa-save"></i> Save Settings
+            </button>
+        </div>
+    </div>
+</div>

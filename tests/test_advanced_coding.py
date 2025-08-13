@@ -16,7 +16,12 @@ class TestAdvancedCodingXBlock(unittest.TestCase):
     def setUp(self):
         """Set up test environment"""
         self.runtime = Mock()
-        self.xblock = AdvancedCodingXBlock(self.runtime, field_data={}, scope_ids=Mock())
+        
+        # Create a proper field_data mock that returns empty dicts for Dict fields
+        field_data = Mock()
+        field_data.get = Mock(side_effect=lambda xblock, field_name: {} if field_name in ['student_files', 'submissions'] else None)
+        
+        self.xblock = AdvancedCodingXBlock(self.runtime, field_data=field_data, scope_ids=Mock())
         
         # Mock scope_ids for user identification
         self.xblock.scope_ids.user_id = 'test_user_123'
@@ -313,7 +318,12 @@ class TestSecurityFeatures(unittest.TestCase):
 
     def setUp(self):
         self.runtime = Mock()
-        self.xblock = AdvancedCodingXBlock(self.runtime, field_data={}, scope_ids=Mock())
+        
+        # Create a proper field_data mock that returns empty dicts for Dict fields
+        field_data = Mock()
+        field_data.get = Mock(side_effect=lambda xblock, field_name: {} if field_name in ['student_files', 'submissions'] else None)
+        
+        self.xblock = AdvancedCodingXBlock(self.runtime, field_data=field_data, scope_ids=Mock())
 
     def test_dangerous_code_detection(self):
         """Test detection of potentially dangerous code patterns"""

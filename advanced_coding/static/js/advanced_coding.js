@@ -24,12 +24,16 @@
             this.element = element;
             this.initArgs = initArgs || {};
             
-            // Parse initialization data
-            this.xblockId = this.initArgs.xblock_id;
-            this.studentFiles = this.initArgs.student_files || {};
-            this.supportedLanguages = this.initArgs.supported_languages || {};
-            this.currentLanguage = this.initArgs.current_language || 'python';
-            this.activeFile = this.initArgs.active_file || 'main.py';
+                    // Parse initialization data
+        this.xblockId = this.initArgs.xblock_id;
+        this.studentFiles = this.initArgs.student_files || {};
+        this.supportedLanguages = this.initArgs.supported_languages || {};
+        this.currentLanguage = this.initArgs.current_language || 'python';
+        this.activeFile = this.initArgs.active_file || 'main.py';
+        
+        // Initialize Monaco Editor
+        this.editor = null;
+        this.monacoLoaded = false;
             
             // Monaco Editor instance
             this.editor = null;

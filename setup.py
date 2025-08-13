@@ -16,7 +16,7 @@ setup(
     name='advanced-coding-xblock',
     version='1.0.0',
     description='Advanced Coding Assessment XBlock with Monaco Editor and Judge0 Integration',
-    long_description=open('README.md').read() if os.path.exists('README.md') else '',
+    long_description=open('README.md', encoding='utf-8').read() if os.path.exists('README.md') else '',
     long_description_content_type='text/markdown',
     author='Your Name',
     author_email='your.email@example.com',
